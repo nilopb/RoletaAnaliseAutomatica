@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin - Roleta Inteligente{% endblock %}
+
+{% block content %}
+<h2>Painel do Administrador</h2>
+<ul>
+    {% for user in users %}
+    <li>{{ user.email }} 
+        <a href="/delete_user/{{ user.id }}" onclick="return confirm('Tem certeza?')">[Excluir]</a>
+    </li>
+    {% endfor %}
+</ul>
+<a href="/logout">Sair</a>
+{% endblock %}
