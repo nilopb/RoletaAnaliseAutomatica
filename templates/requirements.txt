@@ -1,0 +1,9 @@
+flask
+flask_sqlalchemy
+flask_login
+requests
+beautifulsoup4
+pandas
+scikit-learn
+chart.js
+werkzeug
