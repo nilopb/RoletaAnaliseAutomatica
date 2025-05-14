@@ -13,3 +13,11 @@
 </ul>
 <a href="/logout">Sair</a>
 {% endblock %}
+<h2>Painel do Administrador</h2>
+<p>Usuários cadastrados:</p>
+<ul>
+  {% for u in usuarios %}
+    <li>{{ u.email }}</li>
+  {% endfor %}
+</ul>
+<a href="/logout">Sair</a>
