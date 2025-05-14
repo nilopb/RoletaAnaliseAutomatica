@@ -7,3 +7,6 @@ pandas
 scikit-learn
 chart.js
 werkzeug
+Flask
+Flask_SQLAlchemy
+Werkzeug
