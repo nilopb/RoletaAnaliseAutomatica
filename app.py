@@ -1,106 +1,86 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, login_user, login_required, logout_user, current_user, UserMixin
-import os
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'chave_secreta_segura'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.secret_key = 'chave_secreta'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///usuarios.db'
 db = SQLAlchemy(app)
 
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
-
-
-# Modelo de Usuário
-class User(UserMixin, db.Model):
+# Modelo de usuário
+class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(100), unique=True)
-    password = db.Column(db.String(100))
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    senha = db.Column(db.String(200), nullable=False)
 
+# Decorador para login obrigatório
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
+# Decorador para verificar se é admin
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('email') != 'admin@admin.com':
+            return "Acesso negado"
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
-def home():
-    return render_template('index.html')
+def index():
+    return redirect(url_for('login'))
 
-from werkzeug.security import generate_password_hash, check_password_hash
+@app.route('/cadastro', methods=['GET', 'POST'])
+def cadastro():
+    if request.method == 'POST':
+        email = request.form['email']
+        senha = generate_password_hash(request.form['senha'])
+        if Usuario.query.filter_by(email=email).first():
+            return 'Usuário já existe'
+        novo_usuario = Usuario(email=email, senha=senha)
+        db.session.add(novo_usuario)
+        db.session.commit()
+        print(f"[ALERTA] Novo usuário cadastrado: {email}")
+        return redirect(url_for('login'))
+    return render_template('cadastro.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email']
-        password = request.form['password']
-        user = User.query.filter_by(email=email).first()
-
-        if user and check_password_hash(user.password, password):
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        else:
-            flash('Credenciais inválidas')
-            return redirect(url_for('login'))
-
+        senha = request.form['senha']
+        usuario = Usuario.query.filter_by(email=email).first()
+        if usuario and check_password_hash(usuario.senha, senha):
+            session['usuario_id'] = usuario.id
+            session['email'] = usuario.email
+            return redirect(url_for('painel'))
+        return 'Login inválido'
     return render_template('login.html')
 
+@app.route('/painel')
+@login_required
+def painel():
+    return f'Bem-vindo, {session["email"]}!'
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-
-        if User.query.filter_by(email=email).first():
-            flash('Email já cadastrado')
-            return redirect(url_for('register'))
-
-        new_user = User(email=email, password=generate_password_hash(password))
-        db.session.add(new_user)
-        db.session.commit()
-
-        # ALERTA ADMIN - em breve
-        flash('Cadastro realizado com sucesso!')
-        return redirect(url_for('login'))
-
-    return render_template('register.html')
-
+@app.route('/admin')
+@login_required
+@admin_required
+def admin():
+    usuarios = Usuario.query.all()
+    return render_template('admin.html', usuarios=usuarios)
 
 @app.route('/logout')
-@login_required
 def logout():
-    logout_user()
+    session.clear()
     return redirect(url_for('login'))
-
-
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    return render_template('dashboard.html', email=current_user.email)
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
-    @app.route('/admin')
-@login_required
-def admin():
-    if current_user.email != 'admin@roleta.com':  # e-mail fixo do admin
-        return redirect(url_for('dashboard'))
-    users = User.query.all()
-    return render_template('admin.html', users=users)
-
-@app.route('/delete_user/<int:user_id>')
-@login_required
-def delete_user(user_id):
-    if current_user.email != 'admin@roleta.com':
-        return redirect(url_for('dashboard'))
-
-    user = User.query.get(user_id)
-    if user:
-        db.session.delete(user)
-        db.session.commit()
-    return redirect(url_for('admin'))
