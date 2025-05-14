@@ -85,3 +85,22 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+    @app.route('/admin')
+@login_required
+def admin():
+    if current_user.email != 'admin@roleta.com':  # e-mail fixo do admin
+        return redirect(url_for('dashboard'))
+    users = User.query.all()
+    return render_template('admin.html', users=users)
+
+@app.route('/delete_user/<int:user_id>')
+@login_required
+def delete_user(user_id):
+    if current_user.email != 'admin@roleta.com':
+        return redirect(url_for('dashboard'))
+
+    user = User.query.get(user_id)
+    if user:
+        db.session.delete(user)
+        db.session.commit()
+    return redirect(url_for('admin'))
